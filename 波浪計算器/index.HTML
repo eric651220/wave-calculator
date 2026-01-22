@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>波浪計算器 V74.6</title>
+
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#000000">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="apple-touch-icon" href="icon.png">
+
+    <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
+    <link rel="stylesheet" href="style.css">
+    <script src="script.js" defer></script>
+</head>
+<body>
+    <div class="app-window">
+        <div class="header">
+            <div class="header-title">波浪計算器 V74.6</div>
+            <div class="header-controls">
+                <div class="cap-wrapper">
+                    <div class="cap-input-box">
+                        <span class="cap-symbol">$</span>
+                        <input type="number" id="totalCap" placeholder="錢包" value="1000000" oninput="updateEst()">
+                    </div>
+                </div>
+                <button class="hamburger-btn" onclick="toggleMenu()">☰</button>
+            </div>
+        </div>
+        
+        <div id="view-container">
+            <div id="tab-home" class="workspace active">
+                <div class="panel-left">
+                    <div class="unified-grid">
+                        <div class="input-group area-p0">
+                            <div class="fine-tune-box">
+                                <span class="input-prefix">P0</span>
+                                <input type="number" id="vRefA" placeholder="輸入" oninput="checkInitState()">
+                            </div>
+                        </div>
+                        <div class="input-group area-p1">
+                            <div class="fine-tune-box">
+                                <span class="input-prefix">P1</span>
+                                <input type="number" id="vRefB" placeholder="輸入" oninput="checkInitState()">
+                            </div>
+                        </div>
+                        <div class="input-group area-next">
+                            <div class="fine-tune-box" id="box-next">
+                                <button class="ft-btn" onclick="adjustVal('vNext', -10)">−</button>
+                                <span class="input-prefix prefix-blue" style="margin-left:4px;">Next</span>
+                                <input type="number" id="vNext" placeholder="目標價" oninput="onNextInput()" disabled>
+                                <button class="ft-btn" onclick="adjustVal('vNext', 10)">+</button>
+                            </div>
+                        </div>
+                        <div class="input-group area-trade">
+                            <div class="trade-module" id="tradeModule">
+                                <div class="tm-toggle is-buy" id="tradeToggle" onclick="toggleTradeMode()">買</div>
+                                <div class="tm-input">
+                                    <span class="input-prefix prefix-gold">股數</span>
+                                    <input type="number" id="vAmt" placeholder="Shares" oninput="updateEst()">
+                                </div>
+                            </div>
+                            <div id="estAmount" class="est-amount"></div>
+                        </div>
+                    </div>
+                    
+                    <div class="dashboard-area">
+                        <div class="info-row">
+                            <div class="info-card">
+                                <div class="ic-label">持倉 Shares</div>
+                                <div class="ic-val" style="color:var(--color-gold)" id="dispShares">---</div>
+                            </div>
+                            <div class="info-card">
+                                <div class="ic-label">均價 Cost</div>
+                                <div class="ic-val" id="dispCost">---</div>
+                            </div>
+                            <div class="info-card">
+                                <div class="ic-label">已實現 Banked</div>
+                                <div class="ic-val" id="dispRealized">---</div>
+                            </div>
+                            <div class="info-card">
+                                <div class="ic-label">浮動 Paper</div>
+                                <div class="ic-val" id="dispPL">---</div>
+                            </div>
+                        </div>
+                        
+                        <div class="btn-row">
+                            <button class="btn-icon danger" onclick="resetAll()" title="全部重置">↺</button>
+                            <button class="btn-icon" onclick="shareToLine()" title="截圖分享">📷</button>
+                            
+                            <button class="btn-icon" id="btnUndo"
+                                    onmousedown="handleUndoPress()" 
+                                    onmouseup="handleUndoRelease()" 
+                                    onmouseleave="handleUndoRelease()"
+                                    ontouchstart="handleUndoPress(event)" 
+                                    ontouchend="handleUndoRelease(event)"
+                                    oncontextmenu="event.preventDefault();"
+                                    title="上一動">
+                                ↶
+                            </button>
+                            <div id="historyMenu"></div>
+
+                            <button class="btn-icon save" onclick="openSaveModal()" title="儲存行情">💾</button>
+                            
+                            <button id="btnLock" class="btn-main disabled" onclick="confirmNextWave()">初始鎖定</button>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="panel-right">
+                    <div id="chart-container">
+                        <svg id="waveChart" preserveAspectRatio="none">
+                            <defs>
+                                <linearGradient id="chartGradient" x1="0" x2="0" y1="0" y2="1">
+                                    <stop offset="0%" stop-color="var(--chart-grad-start)"/>
+                                    <stop offset="100%" stop-color="var(--chart-grad-stop)"/>
+                                </linearGradient>
+                            </defs>
+                            <g id="gridGroup"></g>
+                            <g id="zoneGroup"></g>
+                            <line id="costLine" class="cost-line" x1="0" y1="0" x2="0" y2="0" style="display:none;" />
+                            <text id="costText" class="cost-text" x="0" y="0" style="display:none;"></text>
+                            <line id="limitLine" class="limit-line" x1="0" y1="0" x2="0" y2="0" style="display:none;" />
+                            <text id="limitText" class="limit-text" x="0" y="0" style="display:none;"></text>
+                            <path id="waveArea" class="chart-area" d="" />
+                            <path id="wavePath" class="chart-line" d="" />
+                            <path id="waveGhost" class="chart-line" style="stroke-dasharray:4 4; opacity:0.5;" d="" />
+                            <g id="dotsGroup"></g>
+                            <g id="chartOverlayGroup" style="pointer-events:none;"></g>
+                            <g id="crosshairGroup" style="display:none;">
+                                <line id="crosshairH" class="crosshair-line" x1="0" y1="0" x2="0" y2="0"/>
+                                <line id="crosshairV" class="crosshair-line" x1="0" y1="0" x2="0" y2="0"/>
+                                <rect id="tooltipBox" class="tooltip-box" rx="4" width="0" height="0" />
+                                <text id="tooltipText" class="tooltip-text" x="0" y="0" text-anchor="middle"></text>
+                                <text id="tapHint" class="tap-hint" x="0" y="0" text-anchor="end">點擊設定價格</text>
+                            </g>
+                        </svg>
+                    </div>
+                    
+                    <div id="header-static">
+                        <div class="smart-header" id="smartHeader" style="display:none;">
+                            <div style="display:flex; align-items:center;">
+                                <button class="chart-toggle-btn" onclick="toggleChartVisibility()">◓</button>
+                                <div class="sh-title" id="headerTitle"></div>
+                            </div>
+                            <div style="display:flex; align-items:center;">
+                                <button class="filter-toggle active" id="btnFilter" onclick="toggleFilterMode()">⚡ 只看強區</button>
+                                <button class="sh-toggle" id="headerToggle" onclick="toggleDirection()">切換 ⇄</button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div id="list-scroll">
+                        <div id="list">
+                            <div style="text-align:center; margin-top:60px; color:var(--text-sub); font-size:14px; font-weight:700; opacity:0.6;">
+                                請輸入 P0 與 P1 以開始
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="tab-ext" class="page-content">
+                <div style="padding:16px 20px; font-size:18px; font-weight:700; border-bottom:1px solid var(--border);">歷史行情紀錄</div>
+                
+                <div class="backup-controls">
+                    <button class="btn-backup" onclick="exportJSON()">
+                        <span>📤</span> 匯出備份
+                    </button>
+                    <button class="btn-backup" onclick="triggerImport()">
+                        <span>📥</span> 匯入還原
+                    </button>
+                    <input type="file" id="importFile" accept=".json" style="display:none" onchange="handleImport(this)">
+                </div>
+
+                <div id="historyList" class="history-list-container">
+                    <div style="text-align:center; margin-top:40px; color:var(--text-sub); width:100%; grid-column: 1/-1;">
+                        尚未儲存任何行情
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="drawer-overlay" id="drawerOverlay" onclick="toggleMenu()"></div>
+        <div class="nav-drawer" id="navDrawer">
+            <div class="drawer-header">導航選單</div>
+            <div class="drawer-item active" id="menu-home" onclick="switchTab('home')">
+                <span>📊</span> 戰情主控
+            </div>
+            <div class="drawer-item" id="menu-ext" onclick="switchTab('ext')">
+                <span>📂</span> 歷史行情
+            </div>
+            <div class="drawer-divider"></div>
+            <div class="drawer-item" onclick="toggleTheme(); toggleMenu()">
+                <span>🌓</span> 切換主題
+            </div>
+        </div>
+
+        <div class="modal-overlay" id="saveModal">
+            <div class="modal-card">
+                <div class="modal-title">儲存行情</div>
+                <div class="modal-input-group">
+                    <span class="modal-label">股號 / 名稱</span>
+                    <input type="text" id="saveSymbol" class="modal-input" placeholder="例如: 2330 台積電">
+                </div>
+                <div class="modal-input-group">
+                    <span class="modal-label">起始日期</span>
+                    <input type="date" id="saveStart" class="modal-input">
+                </div>
+                <div class="modal-input-group">
+                    <span class="modal-label">終點日期</span>
+                    <input type="date" id="saveEnd" class="modal-input">
+                </div>
+                <div class="modal-btn-row">
+                    <button class="modal-btn btn-cancel" onclick="closeSaveModal()">取消</button>
+                    <button class="modal-btn btn-confirm" onclick="saveRecord()">確認儲存</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./sw.js')
+                    .then(reg => console.log('PWA Service Worker 註冊成功', reg.scope))
+                    .catch(err => console.log('PWA 註冊失敗:', err));
+            });
+        }
+    </script>
+</body>
+</html>
